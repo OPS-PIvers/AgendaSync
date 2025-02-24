@@ -1,0 +1,8 @@
+// Define colors at the global scope
+const COLORS = {
+  monday: { bg: '#D9D2E9', content: '#EAE4F2' },     // Light purple 2, Light purple 3
+  tuesday: { bg: '#F6B26B', content: '#FFE599' },    // Dark yellow 1, Light yellow 2
+  wednesday: { bg: '#9FC5E8', content: '#CFE2F3' },  // Light blue 2, Light blue 3
+  thursday: { bg: '#B6D7A8', content: '#D9EAD3' },   // Light green 2, Light green 3
+  friday: { bg: '#E69138', content: '#F9CB9C' }      // Dark orange 1, Light orange 1
+};
