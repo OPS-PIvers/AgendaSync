@@ -1,0 +1,11 @@
+function onOpen() {
+  DocumentApp.getUi()
+    .createMenu('Agenda Tools')
+    .addItem('Create new week at top', 'createWeekAtTop')
+    .addItem('Create new week at bottom', 'createWeekAtBottom')
+    .addItem('Move last week to top', 'moveLastWeekToTop')
+    .addSeparator()
+    .addSubMenu(DocumentApp.getUi().createMenu('Calendar Sync')
+      .addItem('Update from Calendar', 'showWeekSelector'))
+    .addToUi();
+}
