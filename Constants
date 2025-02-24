@@ -6,3 +6,11 @@ const COLORS = {
   thursday: { bg: '#B6D7A8', content: '#D9EAD3' },   // Light green 2, Light green 3
   friday: { bg: '#E69138', content: '#F9CB9C' }      // Dark orange 1, Light orange 1
 };
+
+// Constants - Document IDs
+const CALENDAR_DOC_ID = '1IxU0HnbbRsgdnPhiZ6RyLuvMPR-aIdji-rQul9UTfYE';
+const AGENDA_DOC_IDS = [
+  '1yYU-BtPlnHQ9ZWxcJxB2uxszOPyGORiLW_Nc926Hqds', // Teacher 1
+  '16jFN0v9dDNfBMixFbroLafek7OeEK4aDyod_7tPCFns',// Teacher 2
+  '1dU6h9EAmwO6aAqqAmf1Bca-g_Fc8at6YBtSozxIo5VQ'  // Teacher 3
+];
