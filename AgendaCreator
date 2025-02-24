@@ -1,0 +1,127 @@
+function getNextMonday() {
+  let date = new Date();
+  date.setDate(date.getDate() + (8 - date.getDay()) % 7);
+  return date;
+}
+
+function getCellColor(dayIndex) {
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+  return COLORS[days[dayIndex]];
+}
+
+function setBoldText(cell, text) {
+  let style = {};
+  style[DocumentApp.Attribute.BOLD] = true;
+  cell.editAsText().setAttributes(style);
+}
+
+function createWeeklyTable(body, insertAtTop = true) {
+  try {
+    // Create new table - if inserting at top, use index 0, otherwise append
+    let table = insertAtTop ? body.insertTable(0) : body.appendTable();
+   
+    // Set column widths (approximate conversion from inches to points)
+    const columnWidths = [87, 418]; // 1.208in and 5.813in converted to points
+   
+    // Add day rows
+    let currentDate = getNextMonday();
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+   
+    days.forEach((day, index) => {
+      let row = table.appendTableRow();
+     
+      // Date cell
+      let dateCell = row.appendTableCell();
+      let dateStr = `${day}\n${currentDate.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric'
+      })}`;
+      dateCell.setText(dateStr);
+     
+      // Make day name bold
+      let dateText = dateCell.editAsText();
+      dateText.setAttributes(0, day.length - 1, { [DocumentApp.Attribute.BOLD]: true });
+     
+      // Get colors for the current day
+      const dayColors = getCellColor(index);
+      dateCell.setBackgroundColor(dayColors.bg);
+     
+      // Agenda cell
+      let agendaCell = row.appendTableCell();
+      agendaCell.setText('Topic: \n\nAgenda: \n\nAssignment: ');
+     
+      // Make keywords bold
+      let text = agendaCell.editAsText();
+      text.setAttributes(0, 6, { [DocumentApp.Attribute.BOLD]: true }); // "Topic:"
+      text.setAttributes(8, 15, { [DocumentApp.Attribute.BOLD]: true }); // "Agenda:"
+      text.setAttributes(17, 28, { [DocumentApp.Attribute.BOLD]: true }); // "Assignment:"
+     
+      agendaCell.setBackgroundColor(dayColors.content);
+     
+      // Move to next weekday
+      currentDate.setDate(currentDate.getDate() + 1);
+      while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+
+    // Apply table styling
+    table.setColumnWidth(0, columnWidths[0]);
+    table.setColumnWidth(1, columnWidths[1]);
+
+    // Add spacing based on position
+    if (insertAtTop) {
+      body.insertParagraph(0, '\n\n\n');
+    } else {
+      body.appendParagraph('\n\n\n');
+    }
+
+  } catch (error) {
+    DocumentApp.getUi().alert('Error creating table: ' + error.toString());
+  }
+}
+
+function createWeekAtTop() {
+  try {
+    let doc = DocumentApp.getActiveDocument();
+    let body = doc.getBody();
+    createWeeklyTable(body, true);
+  } catch (error) {
+    DocumentApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+function createWeekAtBottom() {
+  try {
+    let doc = DocumentApp.getActiveDocument();
+    let body = doc.getBody();
+    createWeeklyTable(body, false);
+  } catch (error) {
+    DocumentApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+function moveLastWeekToTop() {
+  try {
+    let doc = DocumentApp.getActiveDocument();
+    let body = doc.getBody();
+    let tables = body.getTables();
+   
+    if (tables.length > 0) {
+      // Get the last table
+      let lastTable = tables[tables.length - 1];
+     
+      // Create the new table at the top
+      body.insertParagraph(0, '\n\n\n');
+      let movedTable = body.insertTable(0, lastTable.copy());
+     
+      // Remove the original table from the bottom
+      let child = body.getChild(body.getChildIndex(lastTable));
+      if (child) {
+        body.removeChild(child);
+      }
+    }
+  } catch (error) {
+    DocumentApp.getUi().alert('Error moving table: ' + error.toString());
+  }
+}
