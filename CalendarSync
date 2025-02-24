@@ -1,0 +1,210 @@
+// Show UI for week selection
+function showWeekSelector() {
+  const ui = DocumentApp.getUi();
+  
+  try {
+    const calendarFile = DriveApp.getFileById(CALENDAR_DOC_ID);
+    const calendarDoc = DocumentApp.openById(calendarFile.getId());
+    const body = calendarDoc.getBody();
+    
+    // Extract week numbers from calendar
+    const text = body.getText();
+    const weekRegex = /Week\s+(\d+)/g;
+    const weeks = [];
+    let match;
+    
+    while (match = weekRegex.exec(text)) {
+      if (!weeks.includes(match[1])) {
+        weeks.push(match[1]);
+      }
+    }
+    
+    weeks.sort((a, b) => Number(a) - Number(b));
+    
+    // Create prompt message
+    let prompt = "Select the week number to update:\n";
+    weeks.forEach(week => {
+      prompt += "Week " + week + "\n";
+    });
+    
+    const response = ui.prompt('Update Agenda', prompt, ui.ButtonSet.OK_CANCEL);
+    
+    if (response.getSelectedButton() == ui.Button.OK) {
+      const weekNumber = response.getResponseText().trim().replace(/\D/g, '');
+      
+      if (weeks.includes(weekNumber)) {
+        const confirmResponse = ui.alert(
+          'Confirm Update',
+          'This will replace the current agenda information in the agenda docs. Continue?',
+          ui.ButtonSet.YES_NO
+        );
+        
+        if (confirmResponse == ui.Button.YES) {
+          updateAgendas(weekNumber);
+        }
+      } else {
+        ui.alert('Invalid week number. Please try again.');
+      }
+    }
+  } catch (error) {
+    ui.alert('Error: ' + error.toString());
+    Logger.log('Error in showWeekSelector: ' + error.toString());
+  }
+}
+
+// Main function to update agendas
+function updateAgendas(weekNumber) {
+  try {
+    const calendarFile = DriveApp.getFileById(CALENDAR_DOC_ID);
+    const calendar = DocumentApp.openById(calendarFile.getId());
+    const body = calendar.getBody();
+    
+    // Find the week in the calendar
+    const tables = body.getTables();
+    let weekData = null;
+    let weekRow = null;
+    
+    // Search through tables to find the week
+    for (let t = 0; t < tables.length; t++) {
+      const table = tables[t];
+      
+      for (let r = 0; r < table.getNumRows(); r++) {
+        const row = table.getRow(r);
+        if (row.getNumCells() > 0) { // Make sure row has cells
+          const cellText = row.getCell(0).getText();
+          
+          if (cellText.includes("Week " + weekNumber)) {
+            // Found the week row, now check if there are enough rows below
+            if (r + 2 < table.getNumRows()) {
+              weekRow = table.getRow(r + 1); // Date row
+              const agendaRow = table.getRow(r + 2); // Agenda row
+              
+              weekData = {
+                dates: [],
+                agendaItems: []
+              };
+              
+              // Get dates from the week row (skipping first column)
+              for (let c = 1; c < weekRow.getNumCells() && c <= 5; c++) {
+                weekData.dates.push(weekRow.getCell(c).getText().trim());
+              }
+              
+              // Get agenda items from next row
+              for (let c = 1; c < agendaRow.getNumCells() && c <= 5; c++) {
+                weekData.agendaItems.push(agendaRow.getCell(c).getText().trim());
+              }
+              
+              break;
+            }
+          }
+        }
+      }
+      
+      if (weekData) break;
+    }
+    
+    if (!weekData) {
+      DocumentApp.getUi().alert('Could not find Week ' + weekNumber + ' in the calendar.');
+      return;
+    }
+    
+    // Log the data we found for debugging
+    Logger.log('Found week data: ' + JSON.stringify(weekData));
+    
+    // Now update each agenda document
+    updateAgendaDocuments(weekData);
+    
+    DocumentApp.getUi().alert('Agenda successfully updated for Week ' + weekNumber + '!');
+  } catch (error) {
+    DocumentApp.getUi().alert('Error: ' + error.toString());
+    Logger.log('Error in updateAgendas: ' + error.toString());
+  }
+}
+
+// Update the agenda documents
+function updateAgendaDocuments(weekData) {
+  AGENDA_DOC_IDS.forEach(docId => {
+    try {
+      const docFile = DriveApp.getFileById(docId);
+      const agendaDoc = DocumentApp.openById(docFile.getId());
+      const body = agendaDoc.getBody();
+      const tables = body.getTables();
+      
+      // Find the table with matching dates
+      for (let t = 0; t < tables.length; t++) {
+        const table = tables[t];
+        let matchFound = false;
+        
+        // Check each row for matching dates
+        for (let r = 0; r < table.getNumRows(); r++) {
+          const row = table.getRow(r);
+          if (row.getNumCells() > 0) { // Make sure row has cells
+            const cellText = row.getCell(0).getText();
+            
+            // Look for any of the dates from weekData
+            for (let d = 0; d < weekData.dates.length; d++) {
+              if (cellText.includes(weekData.dates[d])) {
+                matchFound = true;
+                
+                // Found a matching date, now update agenda items for the week
+                updateAgendaTable(table, weekData);
+                break;
+              }
+            }
+            
+            if (matchFound) break;
+          }
+        }
+        
+        if (matchFound) break;
+      }
+    } catch (error) {
+      Logger.log('Error updating doc ' + docId + ': ' + error.toString());
+      DocumentApp.getUi().alert('Error updating doc: ' + error.toString());
+    }
+  });
+}
+
+// Update a specific agenda table with the week's data
+function updateAgendaTable(table, weekData) {
+  const numRows = table.getNumRows();
+  
+  for (let r = 0; r < numRows; r++) {
+    const row = table.getRow(r);
+    if (row.getNumCells() < 2) continue; // Skip rows without enough cells
+    
+    const cellText = row.getCell(0).getText();
+    
+    // Check if this row contains a date from our week
+    for (let d = 0; d < weekData.dates.length; d++) {
+      const date = weekData.dates[d];
+      
+      if (cellText.includes(date)) {
+        // Found a match, now update the Agenda section
+        const cell = row.getCell(1);
+        const cellContent = cell.getText();
+        const agendaPrefix = "Agenda:";
+        const agendaSuffix = "Assignment:";
+        
+        if (cellContent.includes(agendaPrefix)) {
+          // Split the content to isolate the Agenda section
+          const parts = cellContent.split(agendaPrefix);
+          const afterAgenda = parts[1];
+          
+          let newContent;
+          if (afterAgenda.includes(agendaSuffix)) {
+            // Keep the assignment portion intact
+            const assignmentPart = afterAgenda.split(agendaSuffix);
+            newContent = parts[0] + agendaPrefix + " " + weekData.agendaItems[d] + "\n" + agendaSuffix + assignmentPart[1];
+          } else {
+            // No assignment section found
+            newContent = parts[0] + agendaPrefix + " " + weekData.agendaItems[d];
+          }
+          
+          // Update the cell content
+          cell.setText(newContent);
+        }
+      }
+    }
+  }
+}
